@@ -1,0 +1,74 @@
+version: '3'
+
+networks:
+  vpcbr:
+    driver: bridge
+    ipam:
+     config:
+       - subnet: 10.5.0.0/24
+
+services:
+  postgres:
+    image: postgres:latest
+    environment:
+      - POSTGRES_USER=docker
+      - POSTGRES_PASSWORD=docker
+    expose:
+      - "5432"
+    restart: always
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data'
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      vpcbr:
+        ipv4_address: 10.5.0.5
+  redis:
+    image: docker.io/bitnami/redis:6.2
+    environment:
+      # ALLOW_EMPTY_PASSWORD is recommended only for development.
+      - ALLOW_EMPTY_PASSWORD=yes
+      - REDIS_DISABLE_COMMANDS=FLUSHDB,FLUSHALL
+    #ports:
+    #  - '6379:6379'
+    expose:
+      - "6379"
+    volumes:
+      - 'redis_data:/bitnami/redis/data'
+    networks:
+      vpcbr:
+        ipv4_address: 10.5.0.2
+  asgard-bivrost:
+    build:
+      context: $HOME/Documents/Work/asgard-bivrost
+      dockerfile: $HOME/Documents/Work/asgard-bivrost/Dockerfile
+    image: asgard-bivrost
+    working_dir: /app
+    environment:
+     - APP_REGISTRY_ADDR=redis:6379
+     - APP_REGISTRY_PASSWORD=
+     - APP_PORT=9000
+    networks:
+      vpcbr:
+        ipv4_address: 10.5.0.3
+    depends_on:
+      - "redis"
+  orders-service-example:
+    build:
+       context: .
+       dockerfile: Dockerfile
+       args:
+         GITHUB_USERNAME: ${GITHUB_USERNAME}
+         GITHUB_ACCESS_TOKEN: ${GITHUB_ACCESS_TOKEN}
+    image: orders-service-example
+    working_dir: /app
+    environment:
+      - REDIS_ADDR=${REDIS_ADDR}
+    networks:
+      vpcbr:
+        ipv4_address: 10.5.0.4
+    depends_on:
+      - "redis"
+      - "asgard-bivrost"
+volumes:
+  redis_data:
+    driver: local

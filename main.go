@@ -3,12 +3,14 @@ package main
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"strconv"
 
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/postgres"
 	"github.com/koinworks/asgard-bivrost/libs"
+	bv "github.com/koinworks/asgard-bivrost/service"
 	hmodels "github.com/koinworks/asgard-heimdal/models"
 
 	OrderDelivery "github.com/evrintobing/bivrost_example_task2/modules/orders/delivery"
@@ -17,24 +19,6 @@ import (
 
 	"github.com/joho/godotenv"
 )
-
-type Items struct {
-	ID              int    `json:"id"`
-	NamaProduk      string `json:"nama_produk"`
-	DeskripsiProduk string `json:"deskripsi_produk"`
-	Harga           int    `json:"harga"`
-}
-
-type AddOrder struct {
-	IDProduk     int `json:"id_produk"`
-	JumlahProduk int `json:"jumlah_produk"`
-}
-
-type GetOrder struct {
-	IDOrder      int `json:"id_order"`
-	IDProduk     int `json:"id_produk"`
-	JumlahProduk int `json:"jumlah_produk"`
-}
 
 func main() {
 
@@ -72,11 +56,19 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	bivrostSvc := server.AsGatewayService(
+		"/v1",
+	)
+
 	DB := dbConn()
 
 	orderRepo := OrderRepository.NewOrderRepository(DB)
 	orderUC := OrderUsecase.NewOrderUsecase(orderRepo)
-	OrderDelivery.NewOrderHandler(*server, orderUC)
+	orderHttp := OrderDelivery.NewOrderHandler(orderUC)
+
+	bivrostSvc.Get("/list", orderHttp.GetList)
+	bivrostSvc.Get("/orders", orderHttp.GetOrder)
+	bivrostSvc.Post("/createorder", orderHttp.AddOrder)
 
 	err = server.Start()
 	if err != nil {
@@ -124,6 +116,25 @@ func dbConn() *gorm.DB {
 		return "" + defaulTableName
 	}
 	return DB
+}
+
+func exampleMiddleware(next bv.HandlerFunc) bv.HandlerFunc {
+	return func(ctx *bv.Context) bv.Result {
+		log.Println("This is some middleware")
+		ctx.SetHeader("X-Middleware", "Message From Middleware")
+		return next(ctx)
+	}
+}
+
+func pingHandler(ctx *bv.Context) bv.Result {
+
+	return ctx.JSONResponse(http.StatusOK, bv.ResponseBody{
+		Message: map[string]string{
+			"en": "Welcome to Ping API",
+			"id": "Selamat datang di Ping API",
+		},
+	})
+
 }
 
 // func addOrderHandler(ctx *bv.Context) bv.Result {

@@ -38,7 +38,7 @@ func (uc *usecase) GetItems() (*[]models.Items, error) {
 }
 
 // GetOrder implements orders.OrderUsecase
-func (uc *usecase) GetOrder() (*[]models.Order, error) {
+func (uc *usecase) GetOrder() (*[]models.GetOrder, error) {
 	data, err := uc.repo.GetOrders()
 	if err != nil {
 		return nil, err

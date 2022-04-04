@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"log"
+
 	"github.com/evrintobing/bivrost_example_task2/models"
 	"github.com/evrintobing/bivrost_example_task2/modules/orders"
 	"github.com/jinzhu/gorm"
@@ -18,17 +20,22 @@ func NewOrderRepository(db *gorm.DB) orders.OrderRepository {
 
 // AddOrder implements oreders.OrderRepository
 func (r *repository) AddOrder(order *models.Order) (*models.Order, error) {
-	db := r.db.Create(&order)
+	dataOrder := models.Order{
+		IDProduk:     order.IDProduk,
+		JumlahProduk: order.JumlahProduk,
+	}
+	db := r.db.Create(&dataOrder)
 	if db.Error != nil {
 		return nil, db.Error
 	}
-	return order, nil
+	return &dataOrder, nil
 }
 
 // GetItems implements oreders.OrderRepository
 func (r *repository) GetItems() (*[]models.Items, error) {
 	var item []models.Items
-	db := r.db.Table("orders").Find(&item)
+	db := r.db.Raw("Select * from items").Scan(&item)
+	log.Println(item, "isi item")
 	if db.Error != nil {
 		return nil, db.Error
 	}
@@ -36,9 +43,9 @@ func (r *repository) GetItems() (*[]models.Items, error) {
 }
 
 // GetOrders implements oreders.OrderRepository
-func (r *repository) GetOrders() (*[]models.Order, error) {
-	var order []models.Order
-	db := r.db.Table("orders").Find(&order)
+func (r *repository) GetOrders() (*[]models.GetOrder, error) {
+	var order []models.GetOrder
+	db := r.db.Raw("Select * from orders").Scan(&order)
 	if db.Error != nil {
 		return nil, db.Error
 	}

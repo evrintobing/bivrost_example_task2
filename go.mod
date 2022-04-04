@@ -1,12 +1,12 @@
-module koinworks/orders
+module github.com/evrintobing/bivrost_example_task2
 
 go 1.18
 
 require (
 	github.com/jinzhu/gorm v1.9.16
-	github.com/joho/godotenv v1.3.0
+	github.com/joho/godotenv v1.4.0
 	github.com/koinworks/asgard-bivrost v1.3.3
-	github.com/koinworks/asgard-heimdal v1.3.86-staging
+	github.com/koinworks/asgard-heimdal v1.4.0
 )
 
 require (

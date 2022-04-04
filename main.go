@@ -3,15 +3,17 @@ package main
 import (
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"strconv"
 
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/postgres"
 	"github.com/koinworks/asgard-bivrost/libs"
-	bv "github.com/koinworks/asgard-bivrost/service"
 	hmodels "github.com/koinworks/asgard-heimdal/models"
+
+	OrderDelivery "github.com/evrintobing/bivrost_example_task2/modules/orders/delivery"
+	OrderRepository "github.com/evrintobing/bivrost_example_task2/modules/orders/repository"
+	OrderUsecase "github.com/evrintobing/bivrost_example_task2/modules/orders/usecase"
 
 	"github.com/joho/godotenv"
 )
@@ -70,16 +72,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	DB := dbConn()
 
-	bivrostSvc := server.AsGatewayService(
-		"/example",
-	)
-
-	bivrostSvc.Get("/", bivrostSvc.WithMiddleware(welcomeHandler, exampleMiddleware))
-	// bivrostSvc.Get("/ping-error", pingHandlerWithError)
-	bivrostSvc.Get("/list", bivrostSvc.WithMiddleware(itemsHandler, exampleMiddleware))
-	bivrostSvc.Post("/createorder", bivrostSvc.WithMiddleware(addOrderHandler, exampleMiddleware))
-	bivrostSvc.Get("/orders", bivrostSvc.WithMiddleware(ordersHandler, exampleMiddleware))
+	orderRepo := OrderRepository.NewOrderRepository(DB)
+	orderUC := OrderUsecase.NewOrderUsecase(orderRepo)
+	OrderDelivery.NewOrderHandler(*server, orderUC)
 
 	err = server.Start()
 	if err != nil {
@@ -129,122 +126,57 @@ func dbConn() *gorm.DB {
 	return DB
 }
 
-func exampleMiddleware(next bv.HandlerFunc) bv.HandlerFunc {
-	return func(ctx *bv.Context) bv.Result {
-		log.Println("This is some middleware")
-		ctx.SetHeader("X-Middleware", "Message From Middleware")
-		return next(ctx)
-	}
-}
-
-func welcomeHandler(ctx *bv.Context) bv.Result {
-
-	return ctx.JSONResponse(http.StatusOK, bv.ResponseBody{
-		Message: map[string]string{
-			"en": "Welcome to example API",
-			"id": "Selamat datang di example API",
-		},
-	})
-
-}
-
-// func pingHandlerWithError(ctx *bv.Context) bv.Result {
-// 	err := raiseError(1)
+// func addOrderHandler(ctx *bv.Context) bv.Result {
+// 	var order AddOrder
+// 	err := ctx.BodyJSONBind(&order)
 // 	if err != nil {
-// 		ctx.CaptureSErrors(serror.NewFromErrorc(err, "[asgard-service-example][bivrost] error raised on handler"))
-// 		return ctx.JSONResponse(http.StatusServiceUnavailable, bv.ResponseBody{
+// 		return ctx.JSONResponse(http.StatusBadRequest, bv.ResponseBody{
 // 			Message: map[string]string{
-// 				"en": "Ping API raised an error",
-// 				"id": "Ping API mengalami kegagalan",
+// 				"en": "error when bind data",
+// 				"id": "error ketika membungkus data",
 // 			},
+// 			Data: err,
 // 		})
 // 	}
 
+// 	db := dbConn()
+// 	data := db.Table("orders").Create(&order)
+// 	if data.Error != nil {
+// 		return ctx.JSONResponse(http.StatusBadRequest, bv.ResponseBody{
+// 			Message: map[string]string{
+// 				"en": "API cant find item list on database",
+// 				"id": "API tidak dapat menemukan list item di database",
+// 			},
+// 			Data: data.Error,
+// 		})
+// 	}
 // 	return ctx.JSONResponse(http.StatusOK, bv.ResponseBody{
 // 		Message: map[string]string{
-// 			"en": "Ping API successfully invoked",
-// 			"id": "Ping API berhasil dipanggil",
+// 			"en": "API succes find item list on database",
+// 			"id": "API berhasil menemukan list item di database",
 // 		},
+// 		Data: order,
 // 	})
 // }
 
-// func raiseError(errorCode int) error {
-// 	return fmt.Errorf("error number: %d", errorCode)
+// func ordersHandler(ctx *bv.Context) bv.Result {
+// 	var orders []GetOrder
+// 	db := dbConn()
+// 	data := db.Table("orders").Find(&orders)
+// 	if data.Error != nil {
+// 		return ctx.JSONResponse(http.StatusBadRequest, bv.ResponseBody{
+// 			Message: map[string]string{
+// 				"en": "API cant find item list on database",
+// 				"id": "API tidak dapat menemukan list item di database",
+// 			},
+// 			Data: data.Error,
+// 		})
+// 	}
+// 	return ctx.JSONResponse(http.StatusOK, bv.ResponseBody{
+// 		Message: map[string]string{
+// 			"en": "API succes find item list on database",
+// 			"id": "API berhasil menemukan list item di database",
+// 		},
+// 		Data: orders,
+// 	})
 // }
-
-func itemsHandler(ctx *bv.Context) bv.Result {
-	var itemList []Items
-	db := dbConn()
-	data := db.Find(&itemList)
-	if data.Error != nil {
-		return ctx.JSONResponse(http.StatusBadRequest, bv.ResponseBody{
-			Message: map[string]string{
-				"en": "API cant find item list on database",
-				"id": "API tidak dapat menemukan list item di database",
-			},
-			Data: data.Error,
-		})
-	}
-	return ctx.JSONResponse(http.StatusOK, bv.ResponseBody{
-		Message: map[string]string{
-			"en": "API succes find item list on database",
-			"id": "API berhasil menemukan list item di database",
-		},
-		Data: itemList,
-	})
-}
-
-func addOrderHandler(ctx *bv.Context) bv.Result {
-	var order AddOrder
-	err := ctx.BodyJSONBind(&order)
-	if err != nil {
-		return ctx.JSONResponse(http.StatusBadRequest, bv.ResponseBody{
-			Message: map[string]string{
-				"en": "error when bind data",
-				"id": "error ketika membungkus data",
-			},
-			Data: err,
-		})
-	}
-
-	db := dbConn()
-	data := db.Table("orders").Create(&order)
-	if data.Error != nil {
-		return ctx.JSONResponse(http.StatusBadRequest, bv.ResponseBody{
-			Message: map[string]string{
-				"en": "API cant find item list on database",
-				"id": "API tidak dapat menemukan list item di database",
-			},
-			Data: data.Error,
-		})
-	}
-	return ctx.JSONResponse(http.StatusOK, bv.ResponseBody{
-		Message: map[string]string{
-			"en": "API succes find item list on database",
-			"id": "API berhasil menemukan list item di database",
-		},
-		Data: order,
-	})
-}
-
-func ordersHandler(ctx *bv.Context) bv.Result {
-	var orders []GetOrder
-	db := dbConn()
-	data := db.Table("orders").Find(&orders)
-	if data.Error != nil {
-		return ctx.JSONResponse(http.StatusBadRequest, bv.ResponseBody{
-			Message: map[string]string{
-				"en": "API cant find item list on database",
-				"id": "API tidak dapat menemukan list item di database",
-			},
-			Data: data.Error,
-		})
-	}
-	return ctx.JSONResponse(http.StatusOK, bv.ResponseBody{
-		Message: map[string]string{
-			"en": "API succes find item list on database",
-			"id": "API berhasil menemukan list item di database",
-		},
-		Data: orders,
-	})
-}
